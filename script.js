@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const productTemplate = document.getElementById('product-template');
   
   let productCount = 0;
+  let breakEvenChartInstance = null;
 
   // Add initial product
   addProduct();
@@ -183,8 +184,116 @@ document.addEventListener('DOMContentLoaded', () => {
       </tr>
     `;
 
+    drawChart(products, cf, totalDemand, qeGlobalUnits);
+
     resultsSection.classList.remove('hidden');
     resultsSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function drawChart(products, cf, totalDemand, qeGlobalUnits) {
+    if (breakEvenChartInstance) {
+      breakEvenChartInstance.destroy();
+    }
+
+    const labels = [];
+    const ingresosData = [];
+    const costosData = [];
+
+    // Calculate weighted prices and costs
+    let pvPonderado = 0;
+    let cvPonderado = 0;
+    products.forEach(p => {
+      pvPonderado += p.price * p.participation;
+      cvPonderado += p.cost * p.participation;
+    });
+
+    const maxQ = Math.max(totalDemand * 1.5, qeGlobalUnits * 2);
+    const step = maxQ / 10;
+
+    for (let i = 0; i <= 10; i++) {
+      const q = i * step;
+      labels.push(formatNumber(q));
+      ingresosData.push(q * pvPonderado);
+      costosData.push(cf + q * cvPonderado);
+    }
+
+    const ctx = document.getElementById('breakEvenChart').getContext('2d');
+    breakEvenChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Ingreso Total',
+            data: ingresosData,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.1
+          },
+          {
+            label: 'Costo Total',
+            data: costosData,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        plugins: {
+          title: {
+            display: true,
+            text: 'Gráfico de Punto de Equilibrio Global',
+            color: '#f8fafc',
+            font: { size: 16, family: 'Inter' }
+          },
+          legend: {
+            labels: { color: '#f8fafc', font: { family: 'Inter' } }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.parsed.y !== null) {
+                  label += formatCurrency(context.parsed.y);
+                }
+                return label;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Unidades Ponderadas (Q)', color: '#94a3b8' },
+            ticks: { color: '#94a3b8' },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+          },
+          y: {
+            title: { display: true, text: 'Monto ($)', color: '#94a3b8' },
+            ticks: { 
+              color: '#94a3b8',
+              callback: function(value) {
+                return '$' + value;
+              }
+            },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+          }
+        }
+      }
+    });
   }
 
   function formatCurrency(value) {
