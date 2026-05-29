@@ -1,2 +1,2 @@
 # equilibrio-web
-TP
+https://osicalc.fumoctl.com
